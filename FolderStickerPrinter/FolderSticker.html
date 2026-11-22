@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Folder Sticker Generator (55x200mm x 5)</title>
+  <style>
+    /* ============================================================
+       PRINT CONFIGURATION FOR BROTHER MP TRAY
+       Feed Size: 200 mm (width) x 275 mm (length)
+       Feed Order: Short side (200mm) enters first, Logo end first.
+       ============================================================ */
+    @page {
+      size: 200mm 275mm portrait;
+      margin: 0;
+    }
+
+    @media print {
+      html, body {
+        width: 200mm !important;
+        height: 275mm !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: transparent !important;
+        overflow: hidden !important;
+      }
+
+      .no-print {
+        display: none !important;
+      }
+
+      /* 
+        In physical feed:
+        Width (X-axis) = 200 mm (Sticker height: Logo 30mm, Row 1 33mm, etc.)
+        Height (Y-axis) = 275 mm (Sticker width: 5 columns x 55 mm)
+      */
+      .print-wrapper {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 200mm;
+        height: 275mm;
+        margin: 0;
+        padding: 0;
+      }
+
+      .physical-sticker-row {
+        position: absolute;
+        left: 0;
+        width: 200mm;
+        height: 55mm;
+        display: flex;
+        flex-direction: row;
+      }
+
+      /* Print boxes matching your exact dimensions along the 200mm feed */
+      .p-zone {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        height: 55mm;
+        overflow: hidden;
+      }
+
+      .p-logo { width: 30mm; }
+      .p-row-1 { width: 34mm; } /* 31mm to 64mm (Row 1 Title) */
+      .p-row-2 { width: 33mm; } /* 64mm to 97mm */
+      .p-row-3 { width: 34mm; } /* 97mm to 131mm */
+      .p-row-4 { width: 34mm; } /* 131mm to 165mm */
+      .p-row-5 { width: 33mm; } /* 165mm to 198mm */
+
+      .p-text {
+        font-family: 'Times New Roman', Times, serif;
+        /* Rotate text so it reads upright along each 55mm column */
+        transform: rotate(-90deg);
+        transform-origin: center center;
+        white-space: nowrap;
+        text-align: center;
+      }
+
+      .p-text-title {
+        font-weight: bold;
+        text-transform: uppercase;
+      }
+    }
+
+    /* ============================================================
+       SCREEN UI: Natural horizontal 5-column view for easy editing
+       ============================================================ */
+    @media screen {
+      .print-wrapper {
+        display: none;
+      }
+
+      * {
+        box-sizing: border-box;
+        font-family: 'Times New Roman', Times, serif;
+      }
+
+      body {
+        background-color: #eef2f6;
+        margin: 0;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .toolbar {
+        background: #ffffff;
+        padding: 12px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+        margin-bottom: 20px;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+        font-family: sans-serif;
+      }
+
+      .btn {
+        background: #0d6efd;
+        color: #fff;
+        border: none;
+        padding: 8px 16px;
+        font-size: 14px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      .btn:hover { background: #0b5ed7; }
+      .btn-secondary { background: #6c757d; }
+      .btn-secondary:hover { background: #5c636a; }
+
+      .cal-group {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        color: #333;
+        border-left: 1px solid #ddd;
+        padding-left: 12px;
+      }
+
+      .cal-input {
+        width: 48px;
+        padding: 4px;
+        font-size: 13px;
+        text-align: center;
+      }
+
+      /* Sheet Canvas on screen */
+      .screen-sheet {
+        width: 275mm;
+        height: 200mm;
+        background: #ffffff;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+        display: flex;
+        flex-direction: row;
+        position: relative;
+      }
+
+      .col {
+        width: 55mm;
+        height: 200mm;
+        position: relative;
+        border-right: 1px dashed #d5dbe1;
+        flex-shrink: 0;
+      }
+      .col:last-child {
+        border-right: none;
+      }
+
+      .s-zone {
+        position: absolute;
+        width: 55mm;
+        left: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 0 2mm;
+        overflow: hidden;
+        border-bottom: 1px dotted rgba(0, 0, 0, 0.12);
+      }
+
+      .s-logo {
+        top: 0;
+        height: 30mm;
+        font-family: sans-serif;
+        font-size: 11px;
+        letter-spacing: 1px;
+        color: #aaa;
+        background: #fdfdfd;
+      }
+
+      .s-row-1 { top: 31mm; height: 33mm; }
+      .s-row-2 { top: 64mm; height: 33mm; }
+      .s-row-3 { top: 97mm; height: 34mm; }
+      .s-row-4 { top: 131mm; height: 34mm; }
+      .s-row-5 { top: 165mm; height: 33mm; border-bottom: none; }
+
+      /* Editable DIV text cells */
+      .edit-box {
+        width: 100%;
+        min-height: 24px;
+        outline: none;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        padding: 2px 4px;
+      }
+
+      .edit-box:focus {
+        background: #eef6ff;
+        border-radius: 3px;
+        box-shadow: 0 0 0 1px #70b1ff;
+      }
+
+      .s-row-1 .edit-box {
+        font-weight: bold;
+        text-transform: uppercase;
+        font-size: 16pt;
+      }
+
+      .s-row-2 .edit-box,
+      .s-row-3 .edit-box,
+      .s-row-4 .edit-box,
+      .s-row-5 .edit-box {
+        font-size: 14pt;
+      }
+
+      /* Empty placeholder cues */
+      .edit-box:empty:before {
+        content: attr(data-placeholder);
+        color: #bbb;
+        font-style: italic;
+      }
+
+      .font-tools {
+        position: absolute;
+        right: 2px;
+        bottom: 2px;
+        display: none;
+        gap: 2px;
+      }
+      .s-zone:hover .font-tools {
+        display: flex;
+      }
+      .font-btn {
+        background: rgba(0,0,0,0.6);
+        color: #fff;
+        border: none;
+        width: 16px;
+        height: 16px;
+        font-size: 10px;
+        line-height: 16px;
+        padding: 0;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Controls Bar -->
+  <div class="toolbar no-print">
+    <button class="btn" onclick="prepareAndPrint()">🖨️ Print Labels</button>
+    <button class="btn btn-secondary" onclick="clearAll()">Clear All</button>
+
+    <!-- Mechanical Calibration Nudge (if printer feed has lead margin) -->
+    <div class="cal-group">
+      <span>Lead-Edge Shift:</span>
+      <input type="number" id="shiftX" class="cal-input" value="0" step="0.5" title="X offset (mm)">
+      <span>mm</span>
+      <span style="margin-left: 6px;">Side Shift:</span>
+      <input type="number" id="shiftY" class="cal-input" value="0" step="0.5" title="Y offset (mm)">
+      <span>mm</span>
+    </div>
+
+    <label style="display:flex; align-items:center; gap:5px; font-size:13px; cursor:pointer;">
+      <input type="checkbox" id="guideToggle" onchange="toggleGuides(this.checked)"> Show Guides
+    </label>
+  </div>
+
+  <!-- ON-SCREEN CANVAS -->
+  <div class="screen-sheet" id="screenSheet"></div>
+
+  <!-- PRINT CANVAS (Activated automatically on Print) -->
+  <div class="print-wrapper" id="printWrapper"></div>
+
+  <script>
+    const CONFIG = [
+      { id: 1, sClass: 's-row-1', pClass: 'p-row-1', title: true, defaultPt: 16, placeholder: 'TITLE' },
+      { id: 2, sClass: 's-row-2', pClass: 'p-row-2', title: false, defaultPt: 14, placeholder: 'Line 2' },
+      { id: 3, sClass: 's-row-3', pClass: 'p-row-3', title: false, defaultPt: 14, placeholder: 'Line 3' },
+      { id: 4, sClass: 's-row-4', pClass: 'p-row-4', title: false, defaultPt: 14, placeholder: 'Line 4' },
+      { id: 5, sClass: 's-row-5', pClass: 'p-row-5', title: false, defaultPt: 14, placeholder: 'Line 5' }
+    ];
+
+    function buildScreenUI() {
+      const container = document.getElementById('screenSheet');
+      container.innerHTML = '';
+
+      for (let c = 0; c < 5; c++) {
+        const col = document.createElement('div');
+        col.className = 'col';
+
+        // Pre-printed Logo Area (Screen representation)
+        const logo = document.createElement('div');
+        logo.className = 's-zone s-logo';
+        logo.innerHTML = '<span>PRE-PRINTED LOGO</span>';
+        col.appendChild(logo);
+
+        CONFIG.forEach((cfg) => {
+          const zone = document.createElement('div');
+          zone.className = `s-zone ${cfg.sClass}`;
+
+          const box = document.createElement('div');
+          box.className = 'edit-box';
+          box.contentEditable = 'true';
+          box.spellcheck = false;
+          box.setAttribute('data-placeholder', cfg.placeholder);
+          box.style.fontSize = cfg.defaultPt + 'pt';
+          box.id = `cell-${c}-${cfg.id}`;
+
+          // Enforce uppercase on title
+          if (cfg.title) {
+            box.addEventListener('input', () => {
+              const sel = window.getSelection();
+              const offset = sel.focusOffset;
+              box.innerText = box.innerText.toUpperCase();
+              if (box.childNodes[0]) {
+                const range = document.createRange();
+                range.setStart(box.childNodes[0], Math.min(offset, box.innerText.length));
+                range.collapse(true);
+                sel.removeAllRanges();
+                sel.addRange(range);
+              }
+            });
+          }
+
+          // Font controls
+          const ft = document.createElement('div');
+          ft.className = 'font-tools no-print';
+
+          const bPlus = document.createElement('button');
+          bPlus.className = 'font-btn';
+          bPlus.innerText = '+';
+          bPlus.onclick = (e) => { e.stopPropagation(); adjustFontSize(box, 1); };
+
+          const bMinus = document.createElement('button');
+          bMinus.className = 'font-btn';
+          bMinus.innerText = '-';
+          bMinus.onclick = (e) => { e.stopPropagation(); adjustFontSize(box, -1); };
+
+          ft.appendChild(bPlus);
+          ft.appendChild(bMinus);
+
+          zone.appendChild(box);
+          zone.appendChild(ft);
+          col.appendChild(zone);
+        });
+
+        container.appendChild(col);
+      }
+    }
+
+    function adjustFontSize(el, delta) {
+      let sz = parseInt(window.getComputedStyle(el).fontSize, 10);
+      el.style.fontSize = Math.max(8, sz + delta) + 'px';
+    }
+
+    function toggleGuides(show) {
+      document.querySelectorAll('.s-zone').forEach(el => el.style.border = show ? '1px dashed #999' : '');
+      document.querySelectorAll('.col').forEach(el => el.style.borderRight = show ? '1px dashed #999' : '');
+    }
+
+    function clearAll() {
+      if (confirm('Clear all fields?')) {
+        document.querySelectorAll('.edit-box').forEach(el => el.innerText = '');
+      }
+    }
+
+    // Sync edited cells into the physical feed print canvas
+    function prepareAndPrint() {
+      const pWrapper = document.getElementById('printWrapper');
+      pWrapper.innerHTML = '';
+
+      const shiftX = parseFloat(document.getElementById('shiftX').value) || 0;
+      const shiftY = parseFloat(document.getElementById('shiftY').value) || 0;
+
+      pWrapper.style.transform = `translate(${shiftX}mm, ${shiftY}mm)`;
+
+      /*
+        Physical Paper Geometry in MP Tray:
+        Width (X) = 200mm (Along sticker length: 0-30mm logo, 31-64mm Row 1, etc.)
+        Height (Y) = 275mm (5 labels side-by-side, each 55mm)
+      */
+      for (let c = 0; c < 5; c++) {
+        const row = document.createElement('div');
+        row.className = 'physical-sticker-row';
+        row.style.top = `${c * 55}mm`;
+
+        // Logo section (blank)
+        const pLogo = document.createElement('div');
+        pLogo.className = 'p-zone p-logo';
+        row.appendChild(pLogo);
+
+        // Rows 1-5
+        CONFIG.forEach((cfg) => {
+          const zone = document.createElement('div');
+          zone.className = `p-zone ${cfg.pClass}`;
+
+          const srcBox = document.getElementById(`cell-${c}-${cfg.id}`);
+          const text = srcBox.innerText.trim();
+
+          if (text) {
+            const span = document.createElement('span');
+            span.className = `p-text ${cfg.title ? 'p-text-title' : ''}`;
+            span.innerText = text;
+            span.style.fontSize = window.getComputedStyle(srcBox).fontSize;
+            zone.appendChild(span);
+          }
+
+          row.appendChild(zone);
+        });
+
+        pWrapper.appendChild(row);
+      }
+
+      window.print();
+    }
+
+    buildScreenUI();
+  </script>
+</body>
+</html>
