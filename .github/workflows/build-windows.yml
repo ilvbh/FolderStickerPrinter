@@ -1,30 +1,20 @@
-
 name: Build Windows app
-
 on:
   workflow_dispatch:
   push:
     branches: [ main ]
-
+    tags: [ 'v*' ]
 jobs:
   build:
     runs-on: windows-latest
-
     steps:
-      - name: Check out source
-        uses: actions/checkout@v4
-
-      - name: Set up .NET
-        uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
-
-      - name: Publish Windows app
-        run: dotnet publish ./FolderStickerPrinter/FolderStickerPrinter.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o ./publish
-
-      - name: Upload Windows app
-        uses: actions/upload-artifact@v4
+          dotnet-version: '8.0.x'
+      - name: Publish self-contained Windows app
+        run: dotnet publish .\FolderStickerPrinter\FolderStickerPrinter.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
+      - uses: actions/upload-artifact@v4
         with:
-          name: FolderStickerPrinter-Windows
-          path: ./publish/
-          if-no-files-found: error
+          name: FolderStickerPrinter-win-x64
+          path: FolderStickerPrinter\bin\Release\net8.0-windows\win-x64\publish\

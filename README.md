@@ -1,54 +1,49 @@
-# Folder Sticker Printer
+# Folder Sticker Printer — Version 2 prototype
 
-A Windows desktop starter app for the pre-printed, self-adhesive folder-label sheet used with a Brother MFC-L6900DW series printer.
+Windows desktop starter app for the pre-printed self-adhesive folder-label sheet.
 
-## What it does
+## Sheet and loading
 
-- Five independent folder labels across one 275 × 200 mm sheet.
-- Each label is 55 × 200 mm.
-- Leaves the pre-printed logo zone (0–30 mm) blank.
-- Five one-line text rows per label, centered.
-- Row 1 is automatically uppercase and bold.
-- Each text cell has its own font-size setting (4–48 pt).
-- Uses Times New Roman.
-- Sends jobs directly through the installed Windows printer driver.
-- Explicitly selects the driver's MP / Multi-Purpose Tray source; stops if no MP source is exposed.
+- Physical sheet: 275 mm wide × 200 mm high.
+- Five vertical labels, each 55 mm × 200 mm.
+- Short 200 mm edge enters the Brother MFC-L6900DW MP Tray first.
+- Pre-printed logo side faces up; the app does not print in the logo zone.
+- Logo exclusion: 0–30 mm.
+- Text bands: 31–64, 64–97, 97–131, 131–165, and 165–198 mm.
 
-## Important printing notes
+## Text
 
-The app selects the MP Tray in the Windows print settings and does not select Trays 1–4. The Brother driver and printer firmware still control how an empty tray or paper mismatch is handled. Windows does not consistently expose reliable per-tray-empty status through the standard .NET printing API. Therefore, before production use:
+- Five different labels, each with five independent one-line text fields.
+- Times New Roman.
+- Row 1 is automatically uppercase and bold; its font size remains editable per label.
+- Rows 2–5 have independent editable font sizes per label (4–48 pt).
+- Text is centered horizontally and vertically and clipped to its own sticker cell.
+- Preview font sizes are converted from points to millimetres for a closer physical-size representation.
 
-1. Install the official Brother MFC-L6900DW series driver.
-2. Open the printer's Printing Preferences and configure the MP Tray / manual feed behavior so an empty MP Tray causes a paper request or pause, not automatic source substitution.
-3. Ensure the custom paper size is configured as 200 × 275 mm (feed width × feed length) and the media type is Labels, if supported by the driver.
-4. Test with one sacrificial sheet and confirm the printer asks for the MP Tray when it is empty. Do not test with a valuable adhesive sheet until the driver behavior is verified.
+## Printing changes in v2
 
-This starter app deliberately stops if the installed driver does not expose a paper source whose name contains `MP`, `Multi-Purpose`, or `Multipurpose`. It does not silently choose another source.
+- Defines the logical page as 275 × 200 mm and disables an additional landscape rotation. This is intended to avoid a double-orientation transform with the driver.
+- Selects the Brother driver's MP / Multi-Purpose source by name and stops if it cannot find one. It never intentionally selects Trays 1–4.
+- Applies the driver's reported hard-margin compensation plus user X/Y calibration offsets (in mm).
+- User calibration offsets are available next to the Print button.
+
+## Critical test notes
+
+This is a revised prototype, not hardware-verified. Printer drivers differ in how they interpret custom form orientation, hard margins, and paper-source requests. The app cannot reliably query MP Tray empty status through the standard .NET printing API. The printer driver/firmware must be configured to pause/request paper for MP Tray rather than substitute another tray.
+
+**Do not use an adhesive sheet for the first test.** First test on ordinary paper with the same 275 × 200 mm custom form and verify orientation and registration. If the driver does not offer that custom size, configure it in Brother Printing Preferences / printer server properties. Confirm the printer waits for paper in the MP Tray when it is empty; this behavior is controlled by the Brother driver and printer, not guaranteed by this application.
 
 ## Build on Windows
 
-Requires the .NET 8 SDK.
+Requires .NET 8 SDK:
 
 ```powershell
 dotnet build .\FolderStickerPrinter\FolderStickerPrinter.csproj -c Release
-dotnet publish .\FolderStickerPrinter\FolderStickerPrinter.csproj -c Release -r win-x64 --self-contained true
+dotnet publish .\FolderStickerPrinter\FolderStickerPrinter.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o .\publish
 ```
 
-The published app will be under:
+## GitHub Actions
 
-`FolderStickerPrinter\bin\Release\net8.0-windows\win-x64\publish\`
+The workflow is at `.github/workflows/build-windows.yml`. Upload the whole project to the repository root. It builds on pushes to `main` or manually via **Actions → Build Windows app → Run workflow**. Download the `FolderStickerPrinter-Windows` artifact from the completed run.
 
-Run `FolderStickerPrinter.exe`.
-
-## GitHub
-
-Create a GitHub repository and upload this project. The source can be hosted on GitHub. GitHub Pages cannot run native Windows printer control; the locally installed Windows application is the component that prints directly.
-
-## Geometry
-
-- Physical sheet: 275 × 200 mm.
-- Printer feed orientation: 200 mm feed width × 275 mm feed length, landscape page layout.
-- Five labels: 55 × 200 mm each.
-- Logo exclusion: 0–30 mm.
-- Text row bands: 31–64, 64–97, 97–131, 131–165, 165–198 mm.
-- Small print safety inset: 0.5 mm inside each row.
+GitHub hosts the source and build artifact. The installed Windows desktop app performs the actual printer communication; GitHub Pages/browser-only hosting cannot enforce Windows printer tray selection.

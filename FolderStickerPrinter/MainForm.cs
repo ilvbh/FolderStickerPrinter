@@ -11,12 +11,14 @@ public sealed class MainForm : Form
     private readonly Label status = new();
     private readonly NumericUpDown copies = new();
     private readonly Button printButton = new();
+    private readonly NumericUpDown offsetX = new();
+    private readonly NumericUpDown offsetY = new();
     private readonly string[,] values = new string[5, 5];
     private readonly decimal[,] sizes = new decimal[5, 5];
 
     public MainForm()
     {
-        Text = "Folder Sticker Printer";
+        Text = "Folder Sticker Printer — v2 prototype";
         Width = 1450;
         Height = 900;
         MinimumSize = new Size(1100, 720);
@@ -36,7 +38,7 @@ public sealed class MainForm : Form
 
         var header = new Panel { Dock = DockStyle.Fill };
         var title = new Label { Text = "Folder sticker sheet", Font = new Font("Segoe UI", 18, FontStyle.Bold), AutoSize = true, Location = new Point(0, 4) };
-        var subtitle = new Label { Text = "5 labels • 55 × 200 mm each • Times New Roman • direct printing", AutoSize = true, ForeColor = Color.DimGray, Location = new Point(2, 34) };
+        var subtitle = new Label { Text = "V2 prototype • 5 labels • 55 × 200 mm each • Times New Roman • MP Tray", AutoSize = true, ForeColor = Color.DimGray, Location = new Point(2, 34) };
         header.Controls.Add(title); header.Controls.Add(subtitle);
         root.Controls.Add(header, 0, 0);
         root.SetColumnSpan(header, 2);
@@ -60,6 +62,12 @@ public sealed class MainForm : Form
         bottom.Controls.Add(new Label { Text = "Copies:", AutoSize = true, Padding = new Padding(0, 8, 0, 0) });
         copies.Minimum = 1; copies.Maximum = 99; copies.Value = 1; copies.Width = 60;
         bottom.Controls.Add(copies);
+        bottom.Controls.Add(new Label { Text = "X offset (mm):", AutoSize = true, Padding = new Padding(8, 8, 0, 0) });
+        ConfigureOffset(offsetX);
+        bottom.Controls.Add(offsetX);
+        bottom.Controls.Add(new Label { Text = "Y offset (mm):", AutoSize = true, Padding = new Padding(8, 8, 0, 0) });
+        ConfigureOffset(offsetY);
+        bottom.Controls.Add(offsetY);
         printButton.Text = "Print using MP Tray";
         printButton.AutoSize = true;
         printButton.Height = 38;
@@ -75,7 +83,7 @@ public sealed class MainForm : Form
         right.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
         right.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         root.Controls.Add(right, 1, 1);
-        right.Controls.Add(new Label { Text = "Sheet preview (not to physical scale)", Font = new Font("Segoe UI", 11, FontStyle.Bold), Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 0, 0);
+        right.Controls.Add(new Label { Text = "Sheet preview (physical font-size approximation)", Font = new Font("Segoe UI", 11, FontStyle.Bold), Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 0, 0);
         preview.Dock = DockStyle.Fill;
         preview.BackColor = Color.FromArgb(238, 240, 243);
         preview.Paint += PaintPreview;
@@ -87,6 +95,16 @@ public sealed class MainForm : Form
         status.ForeColor = Color.DarkSlateGray;
         status.Text = $"Printer target: {TargetPrinter}  |  Paper source: MP Tray only";
         Controls.Add(status);
+    }
+
+    private static void ConfigureOffset(NumericUpDown control)
+    {
+        control.DecimalPlaces = 1;
+        control.Minimum = -10;
+        control.Maximum = 10;
+        control.Increment = 0.5M;
+        control.Value = 0;
+        control.Width = 58;
     }
 
     private void BuildGrid()
@@ -185,7 +203,9 @@ public sealed class MainForm : Form
                 string text = grid.Rows[r].Cells[c * 2].Value?.ToString() ?? "";
                 if (r == 0) text = text.ToUpperInvariant();
                 float pt = float.TryParse(grid.Rows[r].Cells[c * 2 + 1].Value?.ToString(), out var f) ? f : (r == 0 ? 12 : 10);
-                using var font = new Font("Times New Roman", Math.Max(4, Math.Min(48, pt)) * scale * 0.65f, r == 0 ? FontStyle.Bold : FontStyle.Regular);
+                // Convert physical point size to preview pixels using the sheet's mm scale.
+                float previewPixels = pt * (25.4f / 72f) * scale;
+                using var font = new Font("Times New Roman", previewPixels, r == 0 ? FontStyle.Bold : FontStyle.Regular, GraphicsUnit.Pixel);
                 using var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap };
                 var rect = new RectangleF(x + 1 * scale, y0 + top * scale, 53 * scale, (bottom - top) * scale);
                 e.Graphics.DrawString(text, font, Brushes.Black, rect, sf);
@@ -218,8 +238,11 @@ public sealed class MainForm : Form
 
             doc.DefaultPageSettings.PaperSource = mp;
             doc.DefaultPageSettings.Margins = new Margins(0, 0, 0, 0);
-            doc.DefaultPageSettings.Landscape = true;
-            doc.DefaultPageSettings.PaperSize = new PaperSize("Folder labels 200 x 275 mm", 7874, 10827);
+            // The sheet is 275 mm across x 200 mm high. It enters the MP Tray short-edge first.
+            // Define the logical page in the same orientation as the physical sheet; do not
+            // ask the driver for an additional landscape rotation.
+            doc.DefaultPageSettings.Landscape = false;
+            doc.DefaultPageSettings.PaperSize = new PaperSize("Folder labels 275 x 200 mm", 10827, 7874);
             doc.OriginAtMargins = false;
             doc.PrinterSettings.Copies = (short)copies.Value;
             doc.PrintPage += DrawPrintPage;
@@ -242,6 +265,12 @@ public sealed class MainForm : Form
         g.PageUnit = GraphicsUnit.Millimeter;
         g.PageScale = 1f;
         g.SmoothingMode = SmoothingMode.HighQuality;
+        // PrintPage graphics are normally offset to the printer's printable origin.
+        // Move back by the driver's hard margins to use physical sheet coordinates,
+        // then apply user calibration offsets.
+        float hardXmm = e.PageSettings.HardMarginX * 0.254f;
+        float hardYmm = e.PageSettings.HardMarginY * 0.254f;
+        g.TranslateTransform((float)offsetX.Value - hardXmm, (float)offsetY.Value - hardYmm);
         g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
 
         float[] tops = { 31, 64, 97, 131, 165 };
@@ -264,9 +293,12 @@ public sealed class MainForm : Form
             };
             // Keep a small safety inset while maximizing usable label width.
             var rect = new RectangleF(c * 55f + 0.5f, tops[r] + 0.5f, 54f, bottoms[r] - tops[r] - 1f);
-            g.SetClip(rect);
+            // Isolate each sticker's own cell so text can never paint into a neighbour.
+            var previousClip = g.Clip;
+            g.SetClip(rect, CombineMode.Intersect);
             g.DrawString(text, font, Brushes.Black, rect, sf);
-            g.ResetClip();
+            g.Clip = previousClip;
+            previousClip.Dispose();
         }
         e.HasMorePages = false;
     }
